@@ -211,25 +211,34 @@
         margin: 12px 0;
         padding: 18px 24px;
         border-radius: 10px;
-        transition: transform 0.1s ease-in-out;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
-    .mini-parti:hover { transform: scale(1.01); box-shadow: inset 4px 0 0 var(--accent); }
+    
+    /* Effet Hover uniquement si activé */
+    #zoneLecture.hover-actif .mini-parti:hover { 
+        transform: scale(1.01); 
+        box-shadow: inset 4px 0 0 var(--accent); 
+    }
 
-    #regleLecture {
-        position: absolute;
+    /* --- FENÊTRE DE LECTURE (MASQUE SOMBRE) --- */
+    #masqueLecture {
+        position: fixed;
         left: 0;
-        width: 100%;
-        height: 12px;
-        background-color: rgba(67, 97, 238, 0.3);
-        pointer-events: none;
+        top: 50%;
+        width: 100vw;
+        height: 100px; 
+        transform: translateY(-50%);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.85); 
+        border-top: 4px solid var(--accent); 
+        border-bottom: 4px solid var(--accent); 
+        pointer-events: none; 
         display: none;
         z-index: 9999;
-        backdrop-filter: invert(10%);
     }
 
     /* Impression propre */
     @media print {
-        #panneauControle, .header-bar, #btnFlottant, #regleLecture { display: none !important; }
+        #panneauControle, .header-bar, #btnFlottant, #masqueLecture { display: none !important; }
         body, #zoneLecture { background-color: white !important; color: black !important; padding: 0 !important; box-shadow: none !important; border: none !important; }
         .mini-parti { page-break-inside: avoid; border-bottom: 1px solid #ddd; margin-bottom: 5px; }
     }
@@ -237,7 +246,7 @@
 </head>
 <body>
 
-<div id="regleLecture"></div>
+<div id="masqueLecture"></div>
 
 <div class="header-bar">
     <h1 style="margin:0; font-size: 1.5rem;" data-i18n="app_title">Lecteur Inclusif</h1>
@@ -249,7 +258,6 @@
 
 <div id="panneauControle">
     <div class="section-titre"><span data-i18n="section_text">📝 1. Texte à adapter</span></div>
-    <!-- Mise à jour automatique (oninput) activée ici -->
     <textarea id="texteEntree" data-i18n-placeholder="placeholder_text" placeholder="Colle ton texte ici..." oninput="sauvegarderEtGenerer()"></textarea>
     
     <div class="barre-boutons">
@@ -346,12 +354,17 @@
         </div>
         
         <div class="reglage-item" style="flex-direction: row; align-items: center; justify-content: space-between;">
-            <label style="margin:0;" data-i18n="label_ruler">Guide de lecture interactif</label>
+            <label style="margin:0;" data-i18n="label_ruler">Fenêtre de lecture (Cache la vue)</label>
             <input type="checkbox" id="caseRegle" style="width:20px;height:20px;" onchange="toggleRegle(this.checked); saveSettings();">
         </div>
 
+        <div class="reglage-item" style="flex-direction: row; align-items: center; justify-content: space-between;">
+            <label style="margin:0;" data-i18n="label_hover">Effet de survol des blocs</label>
+            <input type="checkbox" id="caseHover" checked style="width:20px;height:20px;" onchange="toggleHover(this.checked); saveSettings();">
+        </div>
+
         <div class="reglage-item">
-            <label data-i18n="label_max_words">Taille max des blocs (Mots/bloc) :</label>
+            <label data-i18n="label_max_words">Taille max des blocs (Sauf pour les listes) :</label>
             <div class="reglage-ligne">
                 <input type="range" id="maxMotsParti" min="5" max="100" value="15" oninput="mettreAJourValeur(this, ''); sauvegarderEtGenerer();">
                 <span class="valeur-bulle" id="val-maxMotsParti">15</span>
@@ -362,7 +375,8 @@
 
 <button id="btnFlottant" class="btn" style="position: fixed; top: 15px; right: 15px; display: none; z-index: 10000;" onclick="togglePanneau()">⚙️</button>
 
-<div id="zoneLecture"></div>
+<!-- On ajoute la classe hover-actif par défaut -->
+<div id="zoneLecture" class="hover-actif"></div>
 
 <script>
 // --- INTERNATIONALISATION (Traductions) ---
@@ -370,7 +384,7 @@ const translations = {
     fr: {
         app_title: "Lecteur Inclusif",
         section_text: "📝 1. Texte à adapter",
-        placeholder_text: "Colle ton texte ici pour l'adapter...",
+        placeholder_text: "Colle ton texte ici pour l'adapter. Essaie avec une liste (1. 2. 3.) ou un Exercice...",
         btn_fullscreen: "👁️ Plein Écran",
         btn_print: "🖨️ PDF / Impression",
         btn_save_html: "💾 Exporter HTML",
@@ -399,14 +413,15 @@ const translations = {
         section_focus: "🧠 4. Aide à la Concentration",
         label_bold: "Texte tout en gras",
         label_bionic: "Fixation visuelle (Début des mots)",
-        label_ruler: "Guide de lecture interactif",
-        label_max_words: "Taille max des blocs (Mots/bloc) :",
+        label_ruler: "Fenêtre de lecture (Cache la vue)",
+        label_hover: "Effet de survol des blocs",
+        label_max_words: "Taille max des blocs (Sauf listes) :",
         theme_toggle: "🌓 Thème"
     },
     en: {
         app_title: "Inclusive Reader",
         section_text: "📝 1. Text to Adapt",
-        placeholder_text: "Paste your text here to adapt it...",
+        placeholder_text: "Paste your text here. Try pasting a list (1. 2. 3.) or an Exercise...",
         btn_fullscreen: "👁️ Fullscreen",
         btn_print: "🖨️ Print / PDF",
         btn_save_html: "💾 Export HTML",
@@ -435,13 +450,13 @@ const translations = {
         section_focus: "🧠 4. Focus Aid",
         label_bold: "All Text in Bold",
         label_bionic: "Visual Fixation (Start of words)",
-        label_ruler: "Interactive Reading Guide",
-        label_max_words: "Max block size (Words/block):",
+        label_ruler: "Reading Window (Blinder)",
+        label_hover: "Block hover effect",
+        label_max_words: "Max block size (Except lists):",
         theme_toggle: "🌓 Theme"
     }
 };
 
-// Détection de langue plus robuste
 const userLang = navigator.language || navigator.userLanguage;
 let currentLang = localStorage.getItem('readerSettings_lang') || (userLang.toLowerCase().startsWith('fr') ? 'fr' : 'en');
 
@@ -464,22 +479,21 @@ function applyTranslations() {
     const textarea = document.getElementById('texteEntree');
     if (!textarea.value.trim()) {
         textarea.value = currentLang === 'fr' 
-            ? "Collez votre texte ici. Modifiez les réglages ci-dessus pour adapter l'affichage et réduire la fatigue visuelle."
-            : "Paste your text here. Modify the settings above to adjust the display and reduce visual fatigue.";
+            ? "Exercice 1 :\n1. Voici la première question.\na. Et voici un sous-point important.\n\nCet outil garde les listes comme celle ci-dessus dans un seul bloc de couleur pour ne pas casser ta lecture. Par contre, si tu écris un très long paragraphe normal, il sera découpé en plusieurs blocs colorés pour faciliter le suivi visuel selon le réglage de taille max."
+            : "Exercise 1:\n1. Here is the first question.\na. And here is an important sub-point.\n\nThis tool keeps lists like the one above in a single colored block so it doesn't break your reading flow. However, if you write a very long normal paragraph, it will be split into multiple colored blocks to make visual tracking easier based on the max size setting.";
     }
 }
 
 // --- LOGIQUE DES COULEURS ET THEME ---
-// Différenciation des couleurs pour qu'elles soient lisibles peu importe le thème (clair ou sombre)
 const palettes = {
     light: {
-        standard: ['#1e40af', '#166534', '#b45309', '#b91c1c', '#6b21a8'], // Couleurs foncées pour fond blanc
+        standard: ['#1e40af', '#166534', '#b45309', '#b91c1c', '#6b21a8'],
         protanopie: ['#0033cc', '#b38f00', '#0055ff', '#cca300'],
         tritanopie: ['#cc0000', '#008080', '#990000', '#00cccc'],
         monochrome: ['#333333', '#111111', '#000000']
     },
     dark: {
-        standard: ['#5a95f5', '#60b860', '#e09838', '#e86a6a', '#b77be6'], // Couleurs claires pour fond noir
+        standard: ['#5a95f5', '#60b860', '#e09838', '#e86a6a', '#b77be6'], 
         protanopie: ['#3377ff', '#ffcc00', '#66b3ff', '#ffd633'], 
         tritanopie: ['#ff4d4d', '#00e6e6', '#ff1a1a', '#33ffff'], 
         monochrome: ['#cccccc', '#eeeeee', '#ffffff']
@@ -491,7 +505,6 @@ function toggleTheme() {
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', newTheme);
     
-    // Remplacement automatique des couleurs de fond/texte pour éviter les problèmes de contraste
     if (newTheme === 'dark') {
         document.getElementById('couleurFond1').value = '#1e1e1e';
         document.getElementById('couleurFond2').value = '#121212';
@@ -507,7 +520,7 @@ function toggleTheme() {
 
 // --- SAUVEGARDE DES REGLAGES (LocalStorage) ---
 const settingsList = ['profilCouleur', 'couleurFond1', 'couleurFond2', 'couleurTextePerso', 'choixPolice', 'tailleLettre', 'distanceLettre', 'distanceEspace', 'hauteurLigne', 'maxMotsParti'];
-const checkboxList = ['caseGras', 'caseBionic', 'caseRegle'];
+const checkboxList = ['caseGras', 'caseBionic', 'caseRegle', 'caseHover'];
 
 function saveSettings() {
     settingsList.forEach(id => {
@@ -520,7 +533,6 @@ function saveSettings() {
 }
 
 function loadSettings() {
-    // Thème (Automatique basé sur OS ou depuis sauvegarde)
     const savedTheme = localStorage.getItem('readerSettings_theme');
     if (savedTheme) {
         document.documentElement.setAttribute('data-theme', savedTheme);
@@ -529,7 +541,6 @@ function loadSettings() {
         document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
     }
 
-    // Chargement des autres paramètres
     settingsList.forEach(id => {
         const val = localStorage.getItem('readerSettings_' + id);
         if (val !== null) document.getElementById(id).value = val;
@@ -547,9 +558,9 @@ function loadSettings() {
     });
     
     toggleRegle(document.getElementById('caseRegle').checked);
+    toggleHover(document.getElementById('caseHover').checked);
 }
 
-// --- LOGIQUE PRINCIPALE ---
 function mettreAJourValeur(element, suffixe) {
     document.getElementById('val-' + element.id).textContent = element.value + suffixe;
 }
@@ -580,41 +591,63 @@ function appliquerReglages() {
     document.querySelectorAll('.mini-parti:nth-child(even)').forEach(el => el.style.backgroundColor = c2);
 }
 
+// FORMATTAGE BIONIQUE
+function formaterMots(motsArray, bionicActif) {
+    return motsArray.map(mot => {
+        if (!bionicActif || mot.length <= 1) return mot;
+        let limiteGras = Math.ceil(mot.length * 0.45);
+        if(mot.startsWith('<')) return mot; 
+        return `<strong style="font-weight: 900;">${mot.slice(0, limiteGras)}</strong>${mot.slice(limiteGras)}`;
+    }).join(' ');
+}
+
 function transformerTexte(texte, maxMots, bionicActif, profilCouleur) {
-    const paragraphes = texte.split(/\n+/);
+    const lignes = texte.split('\n'); 
     let htmlResultat = '';
     
-    // Récupération de la palette adaptée au thème actuel (light ou dark)
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
     let paletteActuelle = palettes[currentTheme][profilCouleur] || ['#333'];
     let couleurPerso = document.getElementById('couleurTextePerso').value;
     let couleurIndex = 0;
 
-    paragraphes.forEach(para => {
-        if (para.trim() === '') return;
-        const mots = para.trim().split(/\s+/);
-        let morceauActuel = [];
+    lignes.forEach(ligne => {
+        if (ligne.trim() === '') return;
+
+        // DÉTECTION INTELLIGENTE : "Exercice X", "Question Y", "1.", "1)", "a.", "a)", "-", "*"
+        const regexListe = /^(?:(?:exercice|question)\s*\d*|[a-z0-9]{1,3}[\.\)]|\-|\*)\s/i;
+        const estListeOuTitre = regexListe.test(ligne.trim());
+
+        const mots = ligne.trim().split(/\s+/);
         
-        for (let i = 0; i < mots.length; i++) {
-            morceauActuel.push(mots[i]);
-            const estFinPhrase = /[.!?]$/.test(mots[i]);
+        // Bloc Unique (Liste/Titre)
+        if (estListeOuTitre) {
+            let texteMorceau = formaterMots(mots, bionicActif);
+            let couleurTexte = (profilCouleur === 'personnalise') ? couleurPerso : paletteActuelle[couleurIndex];
             
-            if (morceauActuel.length >= maxMots || estFinPhrase || i === mots.length - 1) {
-                let texteMorceau = morceauActuel.map(mot => {
-                    if (!bionicActif || mot.length <= 1) return mot;
-                    let limiteGras = Math.ceil(mot.length * 0.45);
-                    if(mot.startsWith('<')) return mot; 
-                    return `<strong style="font-weight: 900;">${mot.slice(0, limiteGras)}</strong>${mot.slice(limiteGras)}`;
-                }).join(' ');
+            htmlResultat += `<span class="mini-parti" style="color: ${couleurTexte};">${texteMorceau}</span>`;
+            
+            if (profilCouleur !== 'personnalise') {
+                couleurIndex = (couleurIndex + 1) % paletteActuelle.length;
+            }
+        } 
+        // Blocs Découpés (Paragraphe normal)
+        else {
+            let morceauActuel = [];
+            for (let i = 0; i < mots.length; i++) {
+                morceauActuel.push(mots[i]);
+                const estFinPhrase = /[.!?]$/.test(mots[i]);
                 
-                let couleurTexte = (profilCouleur === 'personnalise') ? couleurPerso : paletteActuelle[couleurIndex];
-                
-                htmlResultat += `<span class="mini-parti" style="color: ${couleurTexte};">${texteMorceau}</span>`;
-                
-                if (profilCouleur !== 'personnalise') {
-                    couleurIndex = (couleurIndex + 1) % paletteActuelle.length;
+                if (morceauActuel.length >= maxMots || estFinPhrase || i === mots.length - 1) {
+                    let texteMorceau = formaterMots(morceauActuel, bionicActif);
+                    let couleurTexte = (profilCouleur === 'personnalise') ? couleurPerso : paletteActuelle[couleurIndex];
+                    
+                    htmlResultat += `<span class="mini-parti" style="color: ${couleurTexte};">${texteMorceau}</span>`;
+                    
+                    if (profilCouleur !== 'personnalise') {
+                        couleurIndex = (couleurIndex + 1) % paletteActuelle.length;
+                    }
+                    morceauActuel = [];
                 }
-                morceauActuel = [];
             }
         }
     });
@@ -649,20 +682,31 @@ function togglePanneau() {
     }
 }
 
+// --- GESTION DU MASQUE (Cache vue) ---
 function toggleRegle(activer) {
-    const regle = document.getElementById('regleLecture');
+    const masque = document.getElementById('masqueLecture');
     if (activer) {
-        regle.style.display = 'block';
-        document.body.addEventListener('mousemove', bougerRegle);
+        masque.style.display = 'block';
+        document.addEventListener('mousemove', bougerRegle);
     } else {
-        regle.style.display = 'none';
-        document.body.removeEventListener('mousemove', bougerRegle);
+        masque.style.display = 'none';
+        document.removeEventListener('mousemove', bougerRegle);
     }
 }
 
 function bougerRegle(e) {
-    const regle = document.getElementById('regleLecture');
-    regle.style.top = (e.pageY - 6) + 'px';
+    const masque = document.getElementById('masqueLecture');
+    masque.style.top = e.clientY + 'px';
+}
+
+// --- GESTION DU HOVER ---
+function toggleHover(activer) {
+    const zone = document.getElementById('zoneLecture');
+    if (activer) {
+        zone.classList.add('hover-actif');
+    } else {
+        zone.classList.remove('hover-actif');
+    }
 }
 
 // --- EXPORTATIONS ---
@@ -721,16 +765,16 @@ function sauvegarderHTML() {
 
 function sauvegarderJPEG() {
     const zoneLecture = document.getElementById('zoneLecture');
-    const regle = document.getElementById('regleLecture');
-    const etatRegle = regle.style.display;
+    const masque = document.getElementById('masqueLecture');
+    const etatMasque = masque.style.display;
     
-    regle.style.display = 'none';
+    masque.style.display = 'none'; 
     
     html2canvas(zoneLecture, {
         backgroundColor: getComputedStyle(document.body).backgroundColor,
         scale: 2
     }).then(canvas => {
-        regle.style.display = etatRegle;
+        masque.style.display = etatMasque;
         
         const link = document.createElement('a');
         link.download = 'texte_accessible.jpg';
@@ -739,9 +783,8 @@ function sauvegarderJPEG() {
     });
 }
 
-// Initialisation au lancement
 window.onload = () => {
-    applyTranslations(); // Applique la langue avant la génération
+    applyTranslations();
     loadSettings();
     genererFiche();
 };
